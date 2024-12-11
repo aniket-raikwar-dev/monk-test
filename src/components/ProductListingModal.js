@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Modal, Checkbox, Spin } from "antd";
 
 const ProductListingModal = ({
@@ -6,15 +6,29 @@ const ProductListingModal = ({
   onClose,
   productsData,
   setProductsData,
+  selectedProducts,
   searchQuery,
   setSearchQuery,
   loader,
   addProduct,
 }) => {
+  const [productCount, setProductCount] = useState(0);
+
+  useEffect(() => {
+    let count = 0;
+    for (let product of productsData) {
+      if (product.is_checked) count++;
+    }
+    setProductCount(count);
+  }, [selectedProducts]);
+
   const toggleProduct = (productId, variants) => {
+    let count = productCount;
     const updatedProducts = productsData.map((product) => {
       if (product.id === productId) {
         const is_checked = !product.is_checked;
+        if (is_checked) count++;
+        else count--;
         return {
           ...product,
           is_checked,
@@ -28,12 +42,13 @@ const ProductListingModal = ({
     });
     // console.log("updated: ", updatedProducts);
     setProductsData(updatedProducts);
+    setProductCount(count);
   };
 
   const toggleVariant = (productId, variantId) => {
+    let count = productCount;
     const updatedProducts = productsData.map((product) => {
       if (product.id === productId) {
-        console.log("product: ", product);
         const updatedVariants = product.variants.map((variant) => {
           if (variant.id === variantId) {
             console.log("variant: ", variant);
@@ -46,6 +61,9 @@ const ProductListingModal = ({
         const allChecked = updatedVariants.every((v) => v.is_checked);
         const someChecked = updatedVariants.some((v) => v.is_checked);
 
+        if (allChecked) count++;
+        if(!allChecked && !someChecked) count--;
+
         return {
           ...product,
           is_checked: allChecked,
@@ -56,6 +74,7 @@ const ProductListingModal = ({
       return product;
     });
     setProductsData(updatedProducts);
+    setProductCount(count);
   };
 
   return (
@@ -65,7 +84,7 @@ const ProductListingModal = ({
       onCancel={onClose}
       footer={
         <div className="modal-footer">
-          <p>1 product selected</p>
+          <p>{productCount} product selected</p>
           <div style={{ display: "flex", gap: "10px" }}>
             <button onClick={onClose} className="modal-foot-btn">
               Cancel
@@ -121,7 +140,7 @@ const ProductListingModal = ({
                       >
                         <p>{variant?.title}</p>
                       </Checkbox>
-                      <p>₹{variant?.price}</p>
+                      <p>₹ {variant?.price}</p>
                     </div>
                   ))}
               </div>

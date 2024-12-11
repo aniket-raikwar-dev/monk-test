@@ -2,10 +2,13 @@ import React, { useEffect, useState } from "react";
 import ProductItem from "./ProductItem";
 import ProductListingModal from "./ProductListingModal";
 import axios from "axios";
+import { closestCorners, DndContext } from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 
 const ProductList = () => {
-  const [products, setProducts] = useState([{}]);
-
   const [isModelOpen, setIsModelOpen] = useState(false);
   const [productsData, setProductsData] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -13,7 +16,7 @@ const ProductList = () => {
   const [selectedProducts, setSelectedProducts] = useState([{}]);
 
   const addNewProduct = () => {
-    setProducts([...products, {}]);
+    setSelectedProducts([...selectedProducts, {}]);
   };
 
   const openModal = () => {
@@ -25,10 +28,13 @@ const ProductList = () => {
   };
 
   const addProduct = () => {
-    const checkedProducts = productsData.filter(
-      (product) => product.is_checked
-    );
-    console.log("selected products: ", selectedProducts);
+    const checkedProducts = productsData.filter((product) => {
+      // Check if the product itself is checked or if any of its variants is checked
+      const isVariantChecked = product.variants?.some(
+        (variant) => variant.is_checked
+      );
+      return product.is_checked || isVariantChecked;
+    });
     setSelectedProducts(checkedProducts);
     setIsModelOpen(false);
   };
@@ -47,9 +53,12 @@ const ProductList = () => {
     setSelectedProducts((prevProducts) => {
       return prevProducts.map((product) => {
         if (product.id === productId) {
-          const updatedVariants = product.variants.filter(
-            (variant) => variant.id !== variantId
-          );
+          const updatedVariants = product.variants.map((variant) => {
+            if (variant.id === variantId) {
+              variant.is_checked = false;
+            }
+            return variant;
+          });
 
           return {
             ...product,
@@ -60,8 +69,6 @@ const ProductList = () => {
       });
     });
   };
-
-
 
   const fetchProductsData = async () => {
     setLoader(true);
@@ -113,17 +120,27 @@ const ProductList = () => {
         </p>
       </div>
 
-      <div className="products-list-container">
-        {selectedProducts?.map((product, index) => (
-          <ProductItem
-            openModal={openModal}
-            product={product}
-            removeProduct={removeProduct}
-            removeVariant={removeVariant}
-            isVariant={false}
-          />
-        ))}
-      </div>
+      <DndContext collisionDetection={closestCorners}>
+        <SortableContext
+          items={selectedProducts}
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="products-list-container">
+            {selectedProducts?.map((product, index) => (
+              <ProductItem
+                id={product.id}
+                key={product?.id}
+                openModal={openModal}
+                product={product}
+                removeProduct={removeProduct}
+                removeVariant={removeVariant}
+                isVariant={false}
+                index={index}
+              />
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
       <div
         style={{ display: "flex", width: "100%", justifyContent: "flex-end" }}
       >
@@ -137,6 +154,7 @@ const ProductList = () => {
         onClose={closeModal}
         productsData={productsData}
         setProductsData={setProductsData}
+        selectedProducts={selectedProducts}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         loader={loader}
