@@ -1,9 +1,17 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import ProductItem from "./ProductItem";
 import ProductListingModal from "./ProductListingModal";
 import axios from "axios";
-import { closestCorners, DndContext } from "@dnd-kit/core";
+import { throttle } from "lodash";
 import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
@@ -13,7 +21,21 @@ const ProductList = () => {
   const [productsData, setProductsData] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loader, setLoader] = useState(false);
-  const [selectedProducts, setSelectedProducts] = useState([{}]);
+  const [selectedProducts, setSelectedProducts] = useState([{ id: 1 }]);
+
+  const sensors = useSensors(useSensor(PointerSensor));
+
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
+
+    if (active.id !== over.id) {
+      setSelectedProducts((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  };
 
   const addNewProduct = () => {
     setSelectedProducts([...selectedProducts, {}]);
@@ -70,7 +92,20 @@ const ProductList = () => {
     });
   };
 
-  const fetchProductsData = async () => {
+  const handleSearchQuery = (e) => {
+    const query = e.target.value;
+    setSearchQuery(query);
+    updateThrottleQuery(query);
+  };
+
+  const updateThrottleQuery = useCallback(
+    throttle((query) => {
+      fetchProductsData(query);
+    }, 1000),
+    []
+  );
+
+  const fetchProductsData = async (searchQuery) => {
     setLoader(true);
     try {
       console.log("start fetching");
@@ -87,7 +122,7 @@ const ProductList = () => {
           is_checked: false,
         })),
       }));
-      console.log("resp: ", modifiedData);
+      // console.log("resp: ", modifiedData);
       setProductsData(modifiedData);
     } catch (error) {
       console.error("Error fetching products:", error);
@@ -97,8 +132,8 @@ const ProductList = () => {
   };
 
   useEffect(() => {
-    fetchProductsData();
-  }, [searchQuery]);
+    fetchProductsData("");
+  }, []);
 
   return (
     <div className="products-container">
@@ -120,7 +155,11 @@ const ProductList = () => {
         </p>
       </div>
 
-      <DndContext collisionDetection={closestCorners}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
         <SortableContext
           items={selectedProducts}
           strategy={verticalListSortingStrategy}
@@ -128,19 +167,21 @@ const ProductList = () => {
           <div className="products-list-container">
             {selectedProducts?.map((product, index) => (
               <ProductItem
-                id={product.id}
                 key={product?.id}
+                id={product?.id}
                 openModal={openModal}
                 product={product}
                 removeProduct={removeProduct}
                 removeVariant={removeVariant}
                 isVariant={false}
                 index={index}
+                handleDragEnd={handleDragEnd}
               />
             ))}
           </div>
         </SortableContext>
       </DndContext>
+
       <div
         style={{ display: "flex", width: "100%", justifyContent: "flex-end" }}
       >
@@ -159,6 +200,7 @@ const ProductList = () => {
         setSearchQuery={setSearchQuery}
         loader={loader}
         addProduct={addProduct}
+        handleSearchQuery={handleSearchQuery}
       />
     </div>
   );

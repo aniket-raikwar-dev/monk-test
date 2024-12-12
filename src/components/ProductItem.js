@@ -1,24 +1,30 @@
 import React, { useState } from "react";
 import { Select } from "antd";
-import { useSortable } from "@dnd-kit/sortable";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
 const ProductItem = ({
   id,
-  key,
   openModal,
   product,
   removeProduct,
   removeVariant,
   isVariant = false,
   index,
+  handleDragEnd,
 }) => {
   const { attributes, listeners, setNodeRef, transform, transition } =
-    useSortable({ key });
+    useSortable({ id });
 
   const style = {
-    transition,
     transform: CSS.Transform.toString(transform),
+    transition,
+    cursor: "grab",
+    outline: "none",
   };
 
   const [isShowVariant, setIsShowVariant] = useState(false);
@@ -33,21 +39,17 @@ const ProductItem = ({
     setIsAddDiscount(!isAddDiscount);
   };
 
-  const handleChange = (value) => {
-    console.log(`selected ${value}`);
-  };
-
   return (
     <div
       ref={setNodeRef}
-      {...attributes}
-      {...listeners}
-      key={key}
+      key={`product-key${index}-${product?.id}`}
       style={style}
       className={isVariant ? "product-nested-box" : "product-box"}
     >
       <div className={isVariant ? "product-nested-item" : "product-item"}>
         <svg
+          {...attributes}
+          {...listeners}
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 24 24"
           fill="#686868"
@@ -86,7 +88,6 @@ const ProductItem = ({
               />
               <Select
                 defaultValue="% off"
-                onChange={handleChange}
                 options={[
                   { value: "% off", label: "% off" },
                   { value: "flat off", label: "flat off" },
@@ -124,21 +125,28 @@ const ProductItem = ({
             {isShowVariant ? "Hide Variants" : "Show Variants"}
           </div>
 
-          {isShowVariant &&
-            product.variants.map(
-              (variant, index) =>
-                variant.is_checked && (
-                  <ProductItem
-                    key={variant.id}
-                    openModal={openModal}
-                    product={{ ...variant, parentId: product.id }}
-                    removeProduct={removeProduct}
-                    removeVariant={removeVariant}
-                    isVariant={true}
-                    index={index}
-                  />
-                )
-            )}
+          {isShowVariant && (
+            <SortableContext
+              items={product.variants.map((variant) => variant.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              {product.variants.map(
+                (variant, index) =>
+                  variant.is_checked && (
+                    <ProductItem
+                      id={variant.id}
+                      openModal={openModal}
+                      product={{ ...variant, parentId: product.id }}
+                      removeProduct={removeProduct}
+                      removeVariant={removeVariant}
+                      isVariant={true}
+                      index={index}
+                      handleDragEnd={handleDragEnd}
+                    />
+                  )
+              )}
+            </SortableContext>
+          )}
         </div>
       )}
     </div>

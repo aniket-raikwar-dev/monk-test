@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { Modal, Checkbox, Spin } from "antd";
-
 const ProductListingModal = ({
   isOpen,
   onClose,
@@ -11,6 +10,7 @@ const ProductListingModal = ({
   setSearchQuery,
   loader,
   addProduct,
+  handleSearchQuery,
 }) => {
   const [productCount, setProductCount] = useState(0);
 
@@ -62,7 +62,7 @@ const ProductListingModal = ({
         const someChecked = updatedVariants.some((v) => v.is_checked);
 
         if (allChecked) count++;
-        if(!allChecked && !someChecked) count--;
+        if (!allChecked && !someChecked) count--;
 
         return {
           ...product,
@@ -109,7 +109,7 @@ const ProductListingModal = ({
             type="text"
             placeholder="Search products"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => handleSearchQuery(e)}
           />
         </div>
       </div>
@@ -120,7 +120,7 @@ const ProductListingModal = ({
         ) : (
           <>
             {productsData?.map((product) => (
-              <div key={1}>
+              <div key={product.id}>
                 <div className="main-item">
                   <Checkbox
                     onChange={() => toggleProduct(product.id, product.variants)}
@@ -133,7 +133,7 @@ const ProductListingModal = ({
                 </div>
                 {product?.variants &&
                   product?.variants?.map((variant) => (
-                    <div key={variant?.product_id} className="sub-item">
+                    <div key={variant?.id} className="sub-item">
                       <Checkbox
                         onChange={() => toggleVariant(product.id, variant.id)}
                         checked={variant.is_checked}
