@@ -5,20 +5,32 @@ import {
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 
 const ProductItem = ({
   id,
   openModal,
   product,
-  removeProduct,
-  removeVariant,
   isVariant = false,
   index,
   handleDragEnd,
+  updateProductSelection,
+  updateProductVariantSelection,
 }) => {
+  const [isShowVariant, setIsShowVariant] = useState(false);
+  const [isAddDiscount, setIsAddDiscount] = useState(false);
+  const [discount, setDiscount] = useState(0);
+
   const { attributes, listeners, setNodeRef, transform, transition } =
     useSortable({ id });
+  const sensors = useSensors(useSensor(PointerSensor));
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -26,10 +38,6 @@ const ProductItem = ({
     cursor: "grab",
     outline: "none",
   };
-
-  const [isShowVariant, setIsShowVariant] = useState(false);
-  const [isAddDiscount, setIsAddDiscount] = useState(false);
-  const [discount, setDiscount] = useState(0);
 
   const showVariant = () => {
     setIsShowVariant(!isShowVariant);
@@ -104,8 +112,12 @@ const ProductItem = ({
         <div
           onClick={() =>
             isVariant
-              ? removeVariant(product?.parentId, product?.id)
-              : removeProduct(product?.id)
+              ? updateProductVariantSelection(
+                  product?.parentId,
+                  product?.id,
+                  true
+                )
+              : updateProductSelection(product?.id, true)
           }
           className="product-remove"
         >
@@ -118,37 +130,44 @@ const ProductItem = ({
           </svg>
         </div>
       </div>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        {product?.variants?.length > 0 && (
+          <div>
+            <div className="show-variant" onClick={showVariant}>
+              {isShowVariant ? "Hide Variants" : "Show Variants"}
+            </div>
 
-      {product?.variants?.length > 0 && (
-        <div>
-          <div className="show-variant" onClick={showVariant}>
-            {isShowVariant ? "Hide Variants" : "Show Variants"}
+            {isShowVariant && (
+              <SortableContext
+                items={product.variants.map((variant) => variant.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                {product.variants.map(
+                  (variant, index) =>
+                    variant.is_checked && (
+                      <ProductItem
+                        id={variant.id}
+                        openModal={openModal}
+                        product={{ ...variant, parentId: product.id }}
+                        isVariant={true}
+                        index={index}
+                        handleDragEnd={handleDragEnd}
+                        updateProductSelection={updateProductSelection}
+                        updateProductVariantSelection={
+                          updateProductVariantSelection
+                        }
+                      />
+                    )
+                )}
+              </SortableContext>
+            )}
           </div>
-
-          {isShowVariant && (
-            <SortableContext
-              items={product.variants.map((variant) => variant.id)}
-              strategy={verticalListSortingStrategy}
-            >
-              {product.variants.map(
-                (variant, index) =>
-                  variant.is_checked && (
-                    <ProductItem
-                      id={variant.id}
-                      openModal={openModal}
-                      product={{ ...variant, parentId: product.id }}
-                      removeProduct={removeProduct}
-                      removeVariant={removeVariant}
-                      isVariant={true}
-                      index={index}
-                      handleDragEnd={handleDragEnd}
-                    />
-                  )
-              )}
-            </SortableContext>
-          )}
-        </div>
-      )}
+        )}
+      </DndContext>
     </div>
   );
 };

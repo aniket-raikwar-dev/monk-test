@@ -1,81 +1,67 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Modal, Checkbox, Spin } from "antd";
+import { throttle } from "lodash";
+import axios from "axios";
+
 const ProductListingModal = ({
   isOpen,
   onClose,
   productsData,
   setProductsData,
-  selectedProducts,
-  searchQuery,
-  setSearchQuery,
-  loader,
-  addProduct,
-  handleSearchQuery,
+  updateProductSelection,
+  updateProductVariantSelection,
+  productCount,
+  updateMainPageProducts,
 }) => {
-  const [productCount, setProductCount] = useState(0);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [loader, setLoader] = useState(false);
+  const productItemsContainerRef = useRef(null);
+
+  const fetchProductsData = async (searchQuery) => {
+    setLoader(true);
+    try {
+      const response = await axios.get(
+        `https://stageapi.monkcommerce.app/task/products/search?search=${searchQuery}&limit=10`,
+        { headers: { "x-api-key": "72njgfa948d9aS7gs5" } }
+      );
+
+      const modifiedData = modifiedAPIData(response?.data);
+      setProductsData(modifiedData);
+    } catch (error) {
+      console.error("Error fetching products:", error);
+    } finally {
+      setLoader(false);
+    }
+  };
+
+  const modifiedAPIData = (data) => {
+    return data.map((product) => ({
+      ...product,
+      is_checked: false,
+      indeterminate: false,
+      variants: product.variants.map((variant) => ({
+        ...variant,
+        is_checked: false,
+      })),
+    }));
+  };
+
+  const handleSearchQuery = (e) => {
+    const query = e.target.value;
+    setSearchQuery(query);
+    updateThrottleQuery(query);
+  };
+
+  const updateThrottleQuery = useCallback(
+    throttle((query) => {
+      fetchProductsData(query);
+    }, 1000),
+    []
+  );
 
   useEffect(() => {
-    let count = 0;
-    for (let product of productsData) {
-      if (product.is_checked) count++;
-    }
-    setProductCount(count);
-  }, [selectedProducts]);
-
-  const toggleProduct = (productId, variants) => {
-    let count = productCount;
-    const updatedProducts = productsData.map((product) => {
-      if (product.id === productId) {
-        const is_checked = !product.is_checked;
-        if (is_checked) count++;
-        else count--;
-        return {
-          ...product,
-          is_checked,
-          variants: product.variants.map((variant) => ({
-            ...variant,
-            is_checked,
-          })),
-        };
-      }
-      return product;
-    });
-    // console.log("updated: ", updatedProducts);
-    setProductsData(updatedProducts);
-    setProductCount(count);
-  };
-
-  const toggleVariant = (productId, variantId) => {
-    let count = productCount;
-    const updatedProducts = productsData.map((product) => {
-      if (product.id === productId) {
-        const updatedVariants = product.variants.map((variant) => {
-          if (variant.id === variantId) {
-            console.log("variant: ", variant);
-            return { ...variant, is_checked: !variant.is_checked };
-          }
-          return variant;
-        });
-
-        // Determine the parent product's state
-        const allChecked = updatedVariants.every((v) => v.is_checked);
-        const someChecked = updatedVariants.some((v) => v.is_checked);
-
-        if (allChecked) count++;
-        if (!allChecked && !someChecked) count--;
-
-        return {
-          ...product,
-          is_checked: allChecked,
-          indeterminate: !allChecked && someChecked, // Optional: use a custom `indeterminate` property
-          variants: updatedVariants,
-        };
-      }
-      return product;
-    });
-    setProductsData(updatedProducts);
-    setProductCount(count);
-  };
+    fetchProductsData(searchQuery);
+  }, []);
 
   return (
     <Modal
@@ -89,7 +75,10 @@ const ProductListingModal = ({
             <button onClick={onClose} className="modal-foot-btn">
               Cancel
             </button>
-            <button onClick={addProduct} className="modal-foot-btn add-btn">
+            <button
+              onClick={() => updateMainPageProducts([])}
+              className="modal-foot-btn add-btn"
+            >
               Add
             </button>
           </div>
@@ -114,7 +103,7 @@ const ProductListingModal = ({
         </div>
       </div>
 
-      <div className="product-items-container">
+      <div className="product-items-container" ref={productItemsContainerRef}>
         {loader ? (
           <Spin className="spin" />
         ) : (
@@ -123,7 +112,7 @@ const ProductListingModal = ({
               <div key={product.id}>
                 <div className="main-item">
                   <Checkbox
-                    onChange={() => toggleProduct(product.id, product.variants)}
+                    onChange={() => updateProductSelection(product.id, false)}
                     checked={product.is_checked}
                     indeterminate={product.indeterminate}
                   >
@@ -135,7 +124,13 @@ const ProductListingModal = ({
                   product?.variants?.map((variant) => (
                     <div key={variant?.id} className="sub-item">
                       <Checkbox
-                        onChange={() => toggleVariant(product.id, variant.id)}
+                        onChange={() =>
+                          updateProductVariantSelection(
+                            product.id,
+                            variant.id,
+                            false
+                          )
+                        }
                         checked={variant.is_checked}
                       >
                         <p>{variant?.title}</p>

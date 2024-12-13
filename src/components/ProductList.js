@@ -1,8 +1,6 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useState } from "react";
 import ProductItem from "./ProductItem";
 import ProductListingModal from "./ProductListingModal";
-import axios from "axios";
-import { throttle } from "lodash";
 import {
   DndContext,
   closestCenter,
@@ -19,26 +17,58 @@ import {
 const ProductList = () => {
   const [isModelOpen, setIsModelOpen] = useState(false);
   const [productsData, setProductsData] = useState([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [loader, setLoader] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState([{ id: 1 }]);
+  const [productCount, setProductCount] = useState(0);
 
   const sensors = useSensors(useSensor(PointerSensor));
 
   const handleDragEnd = (event) => {
     const { active, over } = event;
+    if (!over) return;
 
     if (active.id !== over.id) {
       setSelectedProducts((items) => {
-        const oldIndex = items.findIndex((item) => item.id === active.id);
-        const newIndex = items.findIndex((item) => item.id === over.id);
-        return arrayMove(items, oldIndex, newIndex);
+        const activeProduct = items.find((item) =>
+          item.variants?.some((variant) => variant.id === active.id)
+        );
+
+        if (activeProduct) {
+          // Handle variant reordering
+          const updatedProducts = items.map((product) => {
+            if (product.id === activeProduct.id) {
+              const oldIndex = product.variants.findIndex(
+                (variant) => variant.id === active.id
+              );
+              const newIndex = product.variants.findIndex(
+                (variant) => variant.id === over.id
+              );
+
+              const updatedVariants = arrayMove(
+                product.variants,
+                oldIndex,
+                newIndex
+              );
+
+              return { ...product, variants: updatedVariants };
+            }
+            return product;
+          });
+
+          return updatedProducts;
+        } else {
+          // Handle product reordering
+          const oldIndex = items.findIndex((item) => item.id === active.id);
+          const newIndex = items.findIndex((item) => item.id === over.id);
+
+          return arrayMove(items, oldIndex, newIndex);
+        }
       });
     }
   };
 
   const addNewProduct = () => {
-    setSelectedProducts([...selectedProducts, {}]);
+    const newProductId = selectedProducts.length + 1;
+    setSelectedProducts([...selectedProducts, { id: newProductId }]);
   };
 
   const openModal = () => {
@@ -49,9 +79,10 @@ const ProductList = () => {
     setIsModelOpen(false);
   };
 
-  const addProduct = () => {
-    const checkedProducts = productsData.filter((product) => {
-      // Check if the product itself is checked or if any of its variants is checked
+  const updateMainPageProducts = (data) => {
+    const selectedProducts = data.length ? data : productsData;
+
+    const checkedProducts = selectedProducts?.filter((product) => {
       const isVariantChecked = product.variants?.some(
         (variant) => variant.is_checked
       );
@@ -61,79 +92,65 @@ const ProductList = () => {
     setIsModelOpen(false);
   };
 
-  const removeProduct = (productId) => {
-    setSelectedProducts((prevProducts) => {
-      const updatedProducts = prevProducts.filter(
-        (product) => product.id !== productId
-      );
-
-      return updatedProducts;
+  const updateProductSelection = (productId, isRemove) => {
+    let count = productCount;
+    const updatedProducts = productsData.map((product) => {
+      if (product.id === productId) {
+        const is_checked = !product.is_checked;
+        if (is_checked) count++;
+        else count--;
+        return {
+          ...product,
+          is_checked,
+          variants: product.variants.map((variant) => ({
+            ...variant,
+            is_checked,
+          })),
+        };
+      }
+      return product;
     });
-  };
+    setProductsData(updatedProducts);
+    setProductCount(count);
 
-  const removeVariant = (productId, variantId) => {
-    setSelectedProducts((prevProducts) => {
-      return prevProducts.map((product) => {
-        if (product.id === productId) {
-          const updatedVariants = product.variants.map((variant) => {
-            if (variant.id === variantId) {
-              variant.is_checked = false;
-            }
-            return variant;
-          });
-
-          return {
-            ...product,
-            variants: updatedVariants,
-          };
-        }
-        return product;
-      });
-    });
-  };
-
-  const handleSearchQuery = (e) => {
-    const query = e.target.value;
-    setSearchQuery(query);
-    updateThrottleQuery(query);
-  };
-
-  const updateThrottleQuery = useCallback(
-    throttle((query) => {
-      fetchProductsData(query);
-    }, 1000),
-    []
-  );
-
-  const fetchProductsData = async (searchQuery) => {
-    setLoader(true);
-    try {
-      console.log("start fetching");
-      const response = await axios.get(
-        `https://stageapi.monkcommerce.app/task/products/search?search=${searchQuery}`,
-        { headers: { "x-api-key": "72njgfa948d9aS7gs5" } }
-      );
-      const modifiedData = response?.data.map((product) => ({
-        ...product,
-        is_checked: false,
-        indeterminate: false,
-        variants: product.variants.map((variant) => ({
-          ...variant,
-          is_checked: false,
-        })),
-      }));
-      // console.log("resp: ", modifiedData);
-      setProductsData(modifiedData);
-    } catch (error) {
-      console.error("Error fetching products:", error);
-    } finally {
-      setLoader(false);
+    if (isRemove) {
+      updateMainPageProducts(updatedProducts);
     }
   };
 
-  useEffect(() => {
-    fetchProductsData("");
-  }, []);
+  const updateProductVariantSelection = (productId, variantId, isRemove) => {
+    let count = productCount;
+    const updatedProducts = productsData.map((product) => {
+      if (product.id === productId) {
+        const updatedVariants = product.variants.map((variant) => {
+          if (variant.id === variantId) {
+            return { ...variant, is_checked: !variant.is_checked };
+          }
+          return variant;
+        });
+
+        const allChecked = updatedVariants.every((v) => v.is_checked);
+        const someChecked = updatedVariants.some((v) => v.is_checked);
+
+        if (allChecked) count++;
+        if (!allChecked && !someChecked) count--;
+
+        return {
+          ...product,
+          is_checked: allChecked,
+          indeterminate: !allChecked && someChecked,
+          variants: updatedVariants,
+        };
+      }
+      return product;
+    });
+    setProductsData(updatedProducts);
+    setProductCount(count);
+
+    if (isRemove) {
+      updateMainPageProducts(updatedProducts);
+    }
+  };
 
   return (
     <div className="products-container">
@@ -171,11 +188,11 @@ const ProductList = () => {
                 id={product?.id}
                 openModal={openModal}
                 product={product}
-                removeProduct={removeProduct}
-                removeVariant={removeVariant}
                 isVariant={false}
                 index={index}
                 handleDragEnd={handleDragEnd}
+                updateProductSelection={updateProductSelection}
+                updateProductVariantSelection={updateProductVariantSelection}
               />
             ))}
           </div>
@@ -195,12 +212,10 @@ const ProductList = () => {
         onClose={closeModal}
         productsData={productsData}
         setProductsData={setProductsData}
-        selectedProducts={selectedProducts}
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        loader={loader}
-        addProduct={addProduct}
-        handleSearchQuery={handleSearchQuery}
+        updateProductSelection={updateProductSelection}
+        updateProductVariantSelection={updateProductVariantSelection}
+        productCount={productCount}
+        updateMainPageProducts={updateMainPageProducts}
       />
     </div>
   );
