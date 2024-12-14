@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Modal, Checkbox, Spin } from "antd";
 import { throttle } from "lodash";
+import InfiniteScroll from "react-infinite-scroll-component";
 import axios from "axios";
 
 const ProductListingModal = ({
@@ -14,23 +15,55 @@ const ProductListingModal = ({
   updateMainPageProducts,
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [loader, setLoader] = useState(false);
-  const productItemsContainerRef = useRef(null);
+  const [initialLoader, setInitialLoader] = useState(true);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    hasMore: true,
+    isLoadingMore: false,
+  });
 
-  const fetchProductsData = async (searchQuery) => {
-    setLoader(true);
+  const fetchProductsData = async (searchQuery, pageNumber = 1) => {
+    if (pagination.isLoadingMore) return;
+
+    if (pageNumber === 1) {
+      setInitialLoader(true);
+    } else {
+      setPagination((prev) => ({ ...prev, isLoadingMore: true }));
+    }
     try {
       const response = await axios.get(
-        `https://stageapi.monkcommerce.app/task/products/search?search=${searchQuery}&limit=10`,
+        `https://stageapi.monkcommerce.app/task/products/search?search=${searchQuery}&limit=10&page=${pageNumber}`,
         { headers: { "x-api-key": "72njgfa948d9aS7gs5" } }
       );
 
       const modifiedData = modifiedAPIData(response?.data);
-      setProductsData(modifiedData);
+      setProductsData((prevData) =>
+        pageNumber === 1 ? modifiedData : [...prevData, ...modifiedData]
+      );
+
+      setPagination((prev) => ({
+        page: pageNumber,
+        hasMore: modifiedData.length === 10,
+        isLoadingMore: false,
+      }));
     } catch (error) {
       console.error("Error fetching products:", error);
+      setPagination((prev) => ({
+        ...prev,
+        hasMore: false,
+        isLoadingMore: false,
+      }));
     } finally {
-      setLoader(false);
+      if (pageNumber === 1) {
+        setInitialLoader(false);
+      }
+    }
+  };
+
+  const loadMoreProducts = () => {
+    if (pagination.hasMore && !pagination.isLoadingMore) {
+      const nextPage = pagination.page + 1;
+      fetchProductsData(searchQuery, nextPage);
     }
   };
 
@@ -54,13 +87,18 @@ const ProductListingModal = ({
 
   const updateThrottleQuery = useCallback(
     throttle((query) => {
-      fetchProductsData(query);
+      setPagination({
+        page: 1,
+        hasMore: true,
+        isLoadingMore: false,
+      });
+      fetchProductsData(query, 1);
     }, 1000),
     []
   );
 
   useEffect(() => {
-    fetchProductsData(searchQuery);
+    fetchProductsData(searchQuery, 1);
   }, []);
 
   return (
@@ -103,11 +141,23 @@ const ProductListingModal = ({
         </div>
       </div>
 
-      <div className="product-items-container" ref={productItemsContainerRef}>
-        {loader ? (
+      <InfiniteScroll
+        dataLength={productsData?.length || 0}
+        next={loadMoreProducts}
+        hasMore={pagination.hasMore}
+        height={470}
+        loader={
+          <p className="loading-text">
+            {pagination.isLoadingMore && !initialLoader
+              ? "Loading more products..."
+              : null}
+          </p>
+        }
+      >
+        {initialLoader ? (
           <Spin className="spin" />
         ) : (
-          <>
+          <div>
             {productsData?.map((product) => (
               <div key={product.id}>
                 <div className="main-item">
@@ -140,9 +190,9 @@ const ProductListingModal = ({
                   ))}
               </div>
             ))}
-          </>
+          </div>
         )}
-      </div>
+      </InfiniteScroll>
     </Modal>
   );
 };

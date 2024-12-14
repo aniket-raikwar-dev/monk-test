@@ -79,9 +79,9 @@ const ProductList = () => {
     setIsModelOpen(false);
   };
 
-  const updateMainPageProducts = (data) => {
-    const selectedProducts = data.length ? data : productsData;
 
+  const updateMainPageProducts = (data) => {
+    const selectedProducts = data.length === 0 ? productsData : data;
     const checkedProducts = selectedProducts?.filter((product) => {
       const isVariantChecked = product.variants?.some(
         (variant) => variant.is_checked
@@ -97,8 +97,18 @@ const ProductList = () => {
     const updatedProducts = productsData.map((product) => {
       if (product.id === productId) {
         const is_checked = !product.is_checked;
-        if (is_checked) count++;
-        else count--;
+        if (is_checked) {
+          setStoreSelectedProducts((prevSelected) => [
+            ...prevSelected,
+            { ...product, is_checked },
+          ]);
+          count++;
+        } else {
+          count--;
+          setStoreSelectedProducts((prevSelected) =>
+            prevSelected.filter((p) => p.id !== productId)
+          );
+        }
         return {
           ...product,
           is_checked,
@@ -110,6 +120,7 @@ const ProductList = () => {
       }
       return product;
     });
+
     setProductsData(updatedProducts);
     setProductCount(count);
 
