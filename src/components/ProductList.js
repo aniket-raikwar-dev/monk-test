@@ -79,10 +79,8 @@ const ProductList = () => {
     setIsModelOpen(false);
   };
 
-
-  const updateMainPageProducts = (data) => {
-    const selectedProducts = data.length === 0 ? productsData : data;
-    const checkedProducts = selectedProducts?.filter((product) => {
+  const addProductToMainPage = () => {
+    const checkedProducts = productsData?.filter((product) => {
       const isVariantChecked = product.variants?.some(
         (variant) => variant.is_checked
       );
@@ -92,23 +90,37 @@ const ProductList = () => {
     setIsModelOpen(false);
   };
 
-  const updateProductSelection = (productId, isRemove) => {
+  const removeSelectedProduct = (productId) => {
+    const remainingProducts = selectedProducts.filter(
+      (p) => p.id !== productId
+    );
+    setSelectedProducts(remainingProducts);
+  };
+
+  const removeSelectedProductVariants = (productId, variantId) => {
+    const remainingProductVariants = selectedProducts.map((product) => {
+      if (product.id === productId) {
+        return {
+          ...product,
+          variants: product.variants.filter(
+            (variant) => variant.id !== variantId
+          ),
+        };
+      }
+      return product;
+    });
+    setSelectedProducts(remainingProductVariants);
+  };
+
+  const toggleProductSelection = (productId, isRemove) => {
     let count = productCount;
+
     const updatedProducts = productsData.map((product) => {
       if (product.id === productId) {
         const is_checked = !product.is_checked;
-        if (is_checked) {
-          setStoreSelectedProducts((prevSelected) => [
-            ...prevSelected,
-            { ...product, is_checked },
-          ]);
-          count++;
-        } else {
-          count--;
-          setStoreSelectedProducts((prevSelected) =>
-            prevSelected.filter((p) => p.id !== productId)
-          );
-        }
+        if (is_checked) count++;
+        else count--;
+
         return {
           ...product,
           is_checked,
@@ -125,11 +137,11 @@ const ProductList = () => {
     setProductCount(count);
 
     if (isRemove) {
-      updateMainPageProducts(updatedProducts);
+      removeSelectedProduct(productId);
     }
   };
 
-  const updateProductVariantSelection = (productId, variantId, isRemove) => {
+  const toggleProductVariantSelection = (productId, variantId, isRemove) => {
     let count = productCount;
     const updatedProducts = productsData.map((product) => {
       if (product.id === productId) {
@@ -159,7 +171,7 @@ const ProductList = () => {
     setProductCount(count);
 
     if (isRemove) {
-      updateMainPageProducts(updatedProducts);
+      removeSelectedProductVariants(productId, variantId);
     }
   };
 
@@ -193,17 +205,17 @@ const ProductList = () => {
           strategy={verticalListSortingStrategy}
         >
           <div className="products-list-container">
-            {selectedProducts?.map((product, index) => (
+            {selectedProducts.map((product, index) => (
               <ProductItem
                 key={product?.id}
                 id={product?.id}
+                index={index}
                 openModal={openModal}
                 product={product}
                 isVariant={false}
-                index={index}
                 handleDragEnd={handleDragEnd}
-                updateProductSelection={updateProductSelection}
-                updateProductVariantSelection={updateProductVariantSelection}
+                toggleProductSelection={toggleProductSelection}
+                toggleProductVariantSelection={toggleProductVariantSelection}
               />
             ))}
           </div>
@@ -223,10 +235,10 @@ const ProductList = () => {
         onClose={closeModal}
         productsData={productsData}
         setProductsData={setProductsData}
-        updateProductSelection={updateProductSelection}
-        updateProductVariantSelection={updateProductVariantSelection}
+        toggleProductSelection={toggleProductSelection}
+        toggleProductVariantSelection={toggleProductVariantSelection}
         productCount={productCount}
-        updateMainPageProducts={updateMainPageProducts}
+        addProductToMainPage={addProductToMainPage}
       />
     </div>
   );

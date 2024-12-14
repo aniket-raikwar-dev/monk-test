@@ -21,8 +21,8 @@ const ProductItem = ({
   isVariant = false,
   index,
   handleDragEnd,
-  updateProductSelection,
-  updateProductVariantSelection,
+  toggleProductSelection,
+  toggleProductVariantSelection,
 }) => {
   const [isShowVariant, setIsShowVariant] = useState(false);
   const [isAddDiscount, setIsAddDiscount] = useState(false);
@@ -112,12 +112,12 @@ const ProductItem = ({
         <div
           onClick={() =>
             isVariant
-              ? updateProductVariantSelection(
+              ? toggleProductVariantSelection(
                   product?.parentId,
                   product?.id,
                   true
                 )
-              : updateProductSelection(product?.id, true)
+              : toggleProductSelection(product?.id, true)
           }
           className="product-remove"
         >
@@ -156,9 +156,9 @@ const ProductItem = ({
                         isVariant={true}
                         index={index}
                         handleDragEnd={handleDragEnd}
-                        updateProductSelection={updateProductSelection}
-                        updateProductVariantSelection={
-                          updateProductVariantSelection
+                        toggleProductSelection={toggleProductSelection}
+                        toggleProductVariantSelection={
+                          toggleProductVariantSelection
                         }
                       />
                     )

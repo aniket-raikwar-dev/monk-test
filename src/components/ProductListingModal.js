@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Modal, Checkbox, Spin } from "antd";
 import { throttle } from "lodash";
 import InfiniteScroll from "react-infinite-scroll-component";
@@ -9,10 +9,10 @@ const ProductListingModal = ({
   onClose,
   productsData,
   setProductsData,
-  updateProductSelection,
-  updateProductVariantSelection,
+  toggleProductSelection,
+  toggleProductVariantSelection,
   productCount,
-  updateMainPageProducts,
+  addProductToMainPage,
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [initialLoader, setInitialLoader] = useState(true);
@@ -41,11 +41,11 @@ const ProductListingModal = ({
         pageNumber === 1 ? modifiedData : [...prevData, ...modifiedData]
       );
 
-      setPagination((prev) => ({
+      setPagination({
         page: pageNumber,
         hasMore: modifiedData.length === 10,
         isLoadingMore: false,
-      }));
+      });
     } catch (error) {
       console.error("Error fetching products:", error);
       setPagination((prev) => ({
@@ -59,7 +59,7 @@ const ProductListingModal = ({
       }
     }
   };
-
+  
   const loadMoreProducts = () => {
     if (pagination.hasMore && !pagination.isLoadingMore) {
       const nextPage = pagination.page + 1;
@@ -114,7 +114,7 @@ const ProductListingModal = ({
               Cancel
             </button>
             <button
-              onClick={() => updateMainPageProducts([])}
+              onClick={addProductToMainPage}
               className="modal-foot-btn add-btn"
             >
               Add
@@ -162,7 +162,7 @@ const ProductListingModal = ({
               <div key={product.id}>
                 <div className="main-item">
                   <Checkbox
-                    onChange={() => updateProductSelection(product.id, false)}
+                    onChange={() => toggleProductSelection(product.id, false)}
                     checked={product.is_checked}
                     indeterminate={product.indeterminate}
                   >
@@ -175,7 +175,7 @@ const ProductListingModal = ({
                     <div key={variant?.id} className="sub-item">
                       <Checkbox
                         onChange={() =>
-                          updateProductVariantSelection(
+                          toggleProductVariantSelection(
                             product.id,
                             variant.id,
                             false
